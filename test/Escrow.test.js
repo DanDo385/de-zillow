@@ -87,14 +87,14 @@ describe("Escrow", () => {
 
     describe('Deposits', () => {
         beforeEach(async () => {
-            // Deposit earnest money
-            const depositTx = await escrow.connect(buyer).depositEarnest(1, { value: tokens(5) });
+            // Deposit earnest money that matches the escrow amount
+            const depositTx = await escrow.connect(buyer).depositEarnest(1, { value: tokens(18) });
             await depositTx.wait();
         });
 
         it('Updates contract balance', async () => {
             const balance = await escrow.getBalance();
-            expect(balance).to.be.equal(tokens(5));
+            expect(balance).to.be.equal(tokens(18));
         });
     });
 
@@ -136,8 +136,8 @@ describe("Escrow", () => {
 
     describe('Sale', () => {
         beforeEach(async () => {
-            // Complete the sale process
-            let saleTx = await escrow.connect(buyer).depositEarnest(1, { value: tokens(5) });
+            // Complete the sale process with correct deposit amounts
+            let saleTx = await escrow.connect(buyer).depositEarnest(1, { value: tokens(18) });
             await saleTx.wait();
 
             saleTx = await escrow.connect(inspector).updateInspectionStatus(1, true);
@@ -152,7 +152,8 @@ describe("Escrow", () => {
             saleTx = await escrow.connect(lender).approveSale(1);
             await saleTx.wait();
 
-            await lender.sendTransaction({ to: escrow.address, value: tokens(5) });
+            // Ensure the lender sends enough to cover the purchase price
+            await lender.sendTransaction({ to: escrow.address, value: tokens(90) });
 
             saleTx = await escrow.connect(seller).finalizeSale(1);
             await saleTx.wait();

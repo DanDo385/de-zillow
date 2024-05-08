@@ -41,19 +41,46 @@ describe("Escrow", () => {
             const result = await escrow.nftAddress();
             expect(result).to.equal(realEstate.address);
         });
+
         it('Returns seller', async () => {
-            const result = await escrow.seller()
-            expect(result).to.be.equal(seller.address)
-        })
+            const result = await escrow.seller();
+            expect(result).to.equal(seller.address);
+        });
 
         it('Returns inspector', async () => {
-            const result = await escrow.inspector()
-            expect(result).to.be.equal(inspector.address)
-        })
+            const result = await escrow.inspector();
+            expect(result).to.equal(inspector.address);
+        });
 
         it('Returns lender', async () => {
-            const result = await escrow.lender()
-            expect(result).to.be.equal(lender.address)
-        })
+            const result = await escrow.lender();
+            expect(result).to.equal(lender.address);
+        });
     });
-});
+
+    describe('Listing', () => {
+        it('Updates as listed', async () => {
+            const result = await escrow.isListed(1);
+            expect(result).to.equal(true);
+        });
+
+        it('Returns buyer', async () => {
+            const result = await escrow.buyer(1);
+            expect(result).to.equal(buyer.address);
+        });
+
+        it('Returns purchase price', async () => {
+            const result = await escrow.purchasePrice(1);
+            expect(result).to.equal(tokens(10));
+        });
+
+        it('Returns escrow amount', async () => {
+            const result = await escrow.escrowAmount(1);
+            expect(result).to.equal(tokens(5));
+        });
+
+        it('Updates ownership', async () => {
+            expect(await realEstate.ownerOf(1)).to.equal(escrow.address);
+        });
+    });
+});  // This closing bracket ends the outermost describe block

@@ -37,13 +37,8 @@ contract Escrow {
     mapping(uint256 => bool) public inspectionPassed;
     mapping(uint256 => mapping(address => bool)) public approval;
 
-    constructor(
-        address _nftAddress,
-        address payable _seller,
-        address _inspector,
-        address _lender
-    ) {
-        nftAddress = _nftAddress;
+    constructor(address _nftAddress, address payable _seller, address _inspector, address _lender) {
+        nftAddress = _nftAddress; 
         seller = _seller;
         inspector = _inspector;
         lender = _lender;
@@ -82,12 +77,6 @@ contract Escrow {
         approval[_nftID][msg.sender] = true;
     }
 
-    // Finalize Sale
-    // -> Require inspection status (add more items here, like appraisal)
-    // -> Require sale to be authorized
-    // -> Require funds to be correct amount
-    // -> Transfer NFT to buyer
-    // -> Transfer Funds to Seller
     function finalizeSale(uint256 _nftID) public {
         require(inspectionPassed[_nftID]);
         require(approval[_nftID][buyer[_nftID]]);

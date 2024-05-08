@@ -1,45 +1,45 @@
+// Escrow.test.js
+
 const { expect } = require('chai');
 const { ethers } = require('hardhat');
 
 const tokens = (n) => {
-    return ethers.utils.parseUnits(n.toString(), 'ether')
-}
+    return ethers.utils.parseUnits(n.toString(), 'ether');
+};
 
 describe("Escrow", () => {
     let buyer, seller, inspector, lender;
     let realEstate, escrow;
+    let tokenId; // To hold the minted token ID
 
-    beforeEach(async() => {
+    beforeEach(async () => {
         // Accounts
         [buyer, seller, inspector, lender] = await ethers.getSigners();
-        
+
         // Deploy RealEstate Contract
-        let RealEstate = await ethers.getContractFactory('RealEstate')
-        realEstate = await realEstate.deploy()
+        const RealEstate = await ethers.getContractFactory('RealEstate');
+        realEstate = await RealEstate.deploy();
 
-        // Mint
-        let transaction = await realEstate.connect(seller).mint("https://ipfs.io/ipfs/QmTudSYeM7mz3PkYEWXWqPjomRPHogcMFSq7XAvsvsgAPS");
-        await transaction.wait();
+        // Mint a new token and capture the token ID
+        const mintTx = await realEstate.connect(seller).mint("https://ipfs.io/ipfs/QmTudSYeM7mz3PkYEWXWqPjomRPHogcMFSq7XAvsvsgAPS");
+        const receipt = await mintTx.wait();
+        tokenId = receipt.events[0].args.tokenId;  // Assuming the tokenId is emitted in the first event
 
-        // Deploy Escrow Conmtra
-        let Escrow = await ethers.getContractFactory('Escrow');
-        escrow = await escrow.deploy(realEstate.address, seller.address, inspector.address, lender.address);
+        // Deploy Escrow Contract
+        const Escrow = await ethers.getContractFactory('Escrow');
+        escrow = await Escrow.deploy(realEstate.address, seller.address, inspector.address, lender.address);
 
-        // List Property
-        transaction = await escrow.connect(seller).list(1, buyer.address, tokens(10), tokens(5))
-        await transaction.wait()
-        
-        // Property Approval
-        transaction = await RealEstate.connect(seller).approve(escrow.address, 1);
-        await transaction.wait();
-    })
-        
+        // Approve the Escrow contract to manage the minted token on behalf of seller
+        await realEstate.connect(seller).approve(escrow.address, tokenId);
+
+        // List the property using the token ID
+        await escrow.connect(seller).list(tokenId, buyer.address, tokens(10), tokens(5));
+    });
+
     describe('Deployment', () => {
         it('Returns NFT address', async () => {
-            let result = await escrow.nftAddress();
-            expect(result).to.be.equal(realEstate.address);
-        })
-    })
-        
-        
-       
+            const result = await escrow.nftAddress();
+            expect(result).to.equal(realEstate.address);
+        });
+    });
+});

@@ -3,74 +3,95 @@
 import { useEffect, useState } from 'react';
 import { ethers } from 'ethers';
 
-// Components
+// Import UI components
 import Navigation from './components/Navigation';
 import Search from './components/Search';
 import Home from './components/Home';
 
-// ABIs
-import RealEstate from './abis/RealEstate.json'
-import Escrow from './abis/Escrow.json'
+// Import contract ABIs
+import RealEstate from './abis/RealEstate.json';
+import Escrow from './abis/Escrow.json';
 
-// Config
+// Import application configuration
 import config from './config.json';
 
 function App() {
-  const [provider, setProvider] = useState(null)
-  const [escrow, setEscrow] = useState(null)
-
-  const [account, setAccount] = useState(null)
-
-  const [homes, setHomes] = useState([])
-  const [home, setHome] = useState({})
+  // State management
+  const [provider, setProvider] = useState(null);
+  const [escrow, setEscrow] = useState(null);
+  const [account, setAccount] = useState(null);
+  const [homes, setHomes] = useState([]);
+  const [home, setHome] = useState({});
   const [toggle, setToggle] = useState(false);
 
+  // Load blockchain data and setup event listeners
   const loadBlockchainData = async () => {
-    const provider = new ethers.providers.Web3Provider(window.ethereum)
-    setProvider(provider)
-    const network = await provider.getNetwork()
-
-    const realEstate = new ethers.Contract(config[network.chainId].realEstate.address, RealEstate, provider)
-    const totalSupply = await realEstate.totalSupply()
-    const homes = []
-
-    for (var i = 1; i <= totalSupply; i++) {
-      const uri = await realEstate.tokenURI(i)
-      const response = await fetch(uri)
-      const metadata = await response.json()
-      homes.push(metadata)
+    // Connect to Ethereum network
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    setProvider(provider);
+    
+    // Detect network and setup contracts
+    const network = await provider.getNetwork();
+    const realEstate = new ethers.Contract(
+      config[network.chainId].realEstate.address,
+      RealEstate,
+      provider
+    );
+    const escrow = new ethers.Contract(
+      config[network.chainId].escrow.address,
+      Escrow,
+      provider
+    );
+    
+    // Fetch total supply of tokens to determine how many homes there are
+    const totalSupply = await realEstate.totalSupply();
+    const homes = [];
+    
+    // Fetch metadata for each home based on token ID
+    for (let i = 1; i <= totalSupply; i++) {
+      const uri = await realEstate.tokenURI(i);
+      const response = await fetch(uri);
+      const metadata = await response.json();
+      homes.push(metadata);
     }
 
-    setHomes(homes)
+    // Update states
+    setHomes(homes);
+    setEscrow(escrow);
 
-    const escrow = new ethers.Contract(config[network.chainId].escrow.address, Escrow, provider)
-    setEscrow(escrow)
+    // Handle account changes
+    window.ethereum.on('accountsChanged', async (accounts) => {
+      if (accounts.length > 0) {
+        setAccount(ethers.utils.getAddress(accounts[0]));
+      }
+    });
 
-    window.ethereum.on('accountsChanged', async () => {
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      const account = ethers.utils.getAddress(accounts[0])
-      setAccount(account);
-    })
-  }
+    // Request initial account access
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    if (accounts.length > 0) {
+      setAccount(ethers.utils.getAddress(accounts[0]));
+    }
+  };
 
+  // Initialize blockchain data on component mount
   useEffect(() => {
-    loadBlockchainData()
-  }, [])
+    loadBlockchainData();
+  }, []);
 
-  const togglePop = (home) => {
-    setHome(home)
-    toggle ? setToggle(false) : setToggle(true);
-  }
+  // Toggle home popup
+  const togglePop = (selectedHome) => {
+    setHome(selectedHome);
+    setToggle(!toggle);
+  };
 
+  // Render the application UI
   return (
     <div>
       <Navigation account={account} setAccount={setAccount} />
       <Search />
 
       <div className='cards__section'>
-
         <h3>Homes For You</h3>
-
         <hr />
 
         <div className='cards'>
@@ -91,13 +112,9 @@ function App() {
             </div>
           ))}
         </div>
-
       </div>
 
-      {toggle && (
-        <Home home={home} provider={provider} account={account} escrow={escrow} togglePop={togglePop} />
-      )}
-
+      {toggle && <Home home={home} provider={provider} account={account} escrow={escrow} togglePop={togglePop} />}
     </div>
   );
 }

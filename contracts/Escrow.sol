@@ -1,34 +1,16 @@
-//SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 interface IERC721 {
-    function transferFrom(
-        address _from,
-        address _to,
-        uint256 _id
-    ) external;
+    function transferFrom(address from, address to, uint256 id) external;
 }
 
+/// @title A contract for handling escrow transactions of NFT-based real estate
 contract Escrow {
     address public nftAddress;
     address payable public seller;
     address public inspector;
     address public lender;
-
-    modifier onlyBuyer(uint256 _nftID) {
-        require(msg.sender == buyer[_nftID], "Only buyer can call");
-        _;
-    }
-
-    modifier onlySeller() {
-        require(msg.sender == seller, "Only seller can call");
-        _;
-    }
-
-    modifier onlyInspector() {
-        require(msg.sender == inspector, "Only inspector can call");
-        _;
-    }
 
     mapping(uint256 => bool) public isListed;
     mapping(uint256 => uint256) public purchasePrice;
@@ -37,71 +19,91 @@ contract Escrow {
     mapping(uint256 => bool) public inspectionPassed;
     mapping(uint256 => mapping(address => bool)) public approval;
 
+    /// @dev Ensures only the buyer of the NFT can execute
+    modifier onlyBuyer(uint256 nftID) {
+        require(msg.sender == buyer[nftID], "Only buyer can call");
+        _;
+    }
+
+    /// @dev Ensures only the seller can execute
+    modifier onlySeller() {
+        require(msg.sender == seller, "Only seller can call");
+        _;
+    }
+
+    /// @dev Ensures only the inspector can execute
+    modifier onlyInspector() {
+        require(msg.sender == inspector, "Only inspector can call");
+        _;
+    }
+
     constructor(address _nftAddress, address payable _seller, address _inspector, address _lender) {
-        nftAddress = _nftAddress; 
+        nftAddress = _nftAddress;
         seller = _seller;
         inspector = _inspector;
         lender = _lender;
     }
 
-    function list(
-        uint256 _nftID, 
-        address _buyer, 
-        uint256 _purchasePrice, 
-        uint256 _escrowAmount) 
-        public payable onlySeller {
-
-        IERC721(nftAddress).transferFrom(msg.sender, address(this), _nftID);
-
-        isListed[_nftID] = true;
-        purchasePrice[_nftID] = _purchasePrice;
-        escrowAmount[_nftID] = _escrowAmount;
-        buyer[_nftID] = _buyer;
-    }
-
-    function depositEarnest(uint256 _nftID) public payable onlyBuyer(_nftID) {
-        require(msg.value >= escrowAmount[_nftID]);
-    }
-
-    function updateInspectionStatus(uint256 _nftID, bool _passed)
+    /// @notice Lists an NFT for sale in the escrow contract
+    function list(uint256 nftID, address buyerAddress, uint256 purchasePriceAmount, uint256 escrowAmountValue)
         public
-        onlyInspector
+        payable
+        onlySeller
     {
-        inspectionPassed[_nftID] = _passed;
+        IERC721(nftAddress).transferFrom(msg.sender, address(this), nftID);
+
+        isListed[nftID] = true;
+        purchasePrice[nftID] = purchasePriceAmount;
+        escrowAmount[nftID] = escrowAmountValue;
+        buyer[nftID] = buyerAddress;
     }
 
-    function approveSale(uint256 _nftID) public {
-        approval[_nftID][msg.sender] = true;
+    /// @notice Deposits earnest money for the NFT
+    function depositEarnest(uint256 nftID) public payable onlyBuyer(nftID) {
+        require(msg.value >= escrowAmount[nftID], "Insufficient earnest deposit");
     }
 
-    function finalizeSale(uint256 _nftID) public {
-        require(inspectionPassed[_nftID]);
-        require(approval[_nftID][buyer[_nftID]]);
-        require(approval[_nftID][seller]);
-        require(approval[_nftID][lender]);
-        require(address(this).balance >= purchasePrice[_nftID]);
-
-        isListed[_nftID] = false;
-
-        (bool success, ) = payable(seller).call{value: address(this).balance}(
-            ""
-        );
-        require(success);
-
-        IERC721(nftAddress).transferFrom(address(this), buyer[_nftID], _nftID);
+    /// @notice Updates the inspection status for the NFT
+    function updateInspectionStatus(uint256 nftID, bool passed) public onlyInspector {
+        inspectionPassed[nftID] = passed;
     }
 
-    // Cancel sale if inspection status is not approved, if approved then send to the seller
-    function cancelSale(uint256 _nftID) public {
-        if (inspectionPassed[_nftID] == false) {
-            payable(buyer[_nftID]).transfer(address(this).balance);
+    /// @notice Records approval to proceed with the sale
+    function approveSale(uint256 nftID) public {
+        approval[nftID][msg.sender] = true;
+    }
+
+    /// @notice Finalizes the sale transferring ownership and funds
+    function finalizeSale(uint256 nftID) public {
+        require(inspectionPassed[nftID], "Inspection not passed");
+        require(approval[nftID][buyer[nftID]], "Buyer has not approved");
+        require(approval[nftID][seller], "Seller has not approved");
+        require(approval[nftID][lender], "Lender has not approved");
+        require(address(this).balance >= purchasePrice[nftID], "Insufficient funds to complete sale");
+
+        isListed[nftID] = false;
+
+        // Transfer all funds to the seller
+        (bool success, ) = seller.call{value: address(this).balance}("");
+        require(success, "Payment to seller failed");
+
+        // Transfer NFT ownership to the buyer
+        IERC721(nftAddress).transferFrom(address(this), buyer[nftID], nftID);
+    }
+
+    /// @notice Cancels the sale returning funds appropriately based on inspection results
+    function cancelSale(uint256 nftID) public {
+        if (!inspectionPassed[nftID]) {
+            payable(buyer[nftID]).transfer(address(this).balance);
         } else {
             payable(seller).transfer(address(this).balance);
         }
     }
 
+    /// @notice Allows the contract to receive funds
     receive() external payable {}
 
+    /// @notice Returns the balance held in the contract
     function getBalance() public view returns (uint256) {
         return address(this).balance;
     }

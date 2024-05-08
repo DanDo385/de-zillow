@@ -1,67 +1,47 @@
-// We require the Hardhat Runtime Environment explicitly here. This is optional
-// but useful for running the script in a standalone fashion through `node <script>`.
-//
-// You can also run a script with `npx hardhat run <script>`. If you do that, Hardhat
-// will compile your contracts, add the Hardhat Runtime Environment's members to the
-// global scope, and execute the script.
+// Import the Hardhat Runtime Environment
 const hre = require("hardhat");
 
-const tokens = (n) => {
-  return ethers.utils.parseUnits(n.toString(), 'ether')
-}
+// Helper function to convert tokens into the smallest unit (e.g., ether to wei)
+const tokens = (n) => ethers.utils.parseUnits(n.toString(), 'ether');
 
 async function main() {
-  // Setup accounts
-  const [buyer, seller, inspector, lender] = await ethers.getSigners()
+    // Deploy contracts and mint properties using Hardhat network signers
+    const [buyer, seller, inspector, lender] = await ethers.getSigners();
 
-  // Deploy Real Estate
-  const RealEstate = await ethers.getContractFactory('RealEstate')
-  const realEstate = await RealEstate.deploy()
-  await realEstate.deployed()
+    // Deploy the Real Estate contract
+    const RealEstate = await ethers.getContractFactory('RealEstate');
+    const realEstate = await RealEstate.deploy();
+    await realEstate.deployed();
+    console.log(`Deployed Real Estate Contract at: ${realEstate.address}`);
+    
+    // Mint 3 properties with unique metadata URLs
+    console.log(`Minting 3 properties...`);
+    for (let i = 1; i <= 3; i++) {
+        const tx = await realEstate.connect(seller).mint(`https://ipfs.io/ipfs/QmQVcpsjrA6cr1iJjZAodYwmPekYgbnXGo4DFubJiLc2EB/${i}.json`);
+        await tx.wait();
+    }
 
-  console.log(`Deployed Real Estate Contract at: ${realEstate.address}`)
-  console.log(`Minting 3 properties...\n`)
+    // Deploy the Escrow contract
+    const Escrow = await ethers.getContractFactory('Escrow');
+    const escrow = await Escrow.deploy(realEstate.address, seller.address, inspector.address, lender.address);
+    await escrow.deployed();
+    console.log(`Deployed Escrow Contract at: ${escrow.address}`);
 
-  for (let i = 0; i < 3; i++) {
-    const transaction = await realEstate.connect(seller).mint(`https://ipfs.io/ipfs/QmQVcpsjrA6cr1iJjZAodYwmPekYgbnXGo4DFubJiLc2EB/${i + 1}.json`)
-    await transaction.wait()
-  }
+    // Approve and list all 3 properties in the escrow contract
+    console.log(`Listing 3 properties...`);
+    for (let i = 1; i <= 3; i++) {
+        const approveTx = await realEstate.connect(seller).approve(escrow.address, i);
+        await approveTx.wait();
 
-  // Deploy Escrow
-  const Escrow = await ethers.getContractFactory('Escrow')
-  const escrow = await Escrow.deploy(
-    realEstate.address,
-    seller.address,
-    inspector.address,
-    lender.address
-  )
-  await escrow.deployed()
+        const listTx = await escrow.connect(seller).list(i, buyer.address, tokens(20 - (i - 1) * 5), tokens(10 - (i - 1) * 5));
+        await listTx.wait();
+    }
 
-  console.log(`Deployed Escrow Contract at: ${escrow.address}`)
-  console.log(`Listing 3 properties...\n`)
-
-  for (let i = 0; i < 3; i++) {
-    // Approve properties...
-    let transaction = await realEstate.connect(seller).approve(escrow.address, i + 1)
-    await transaction.wait()
-  }
-
-  // Listing properties...
-  transaction = await escrow.connect(seller).list(1, buyer.address, tokens(20), tokens(10))
-  await transaction.wait()
-
-  transaction = await escrow.connect(seller).list(2, buyer.address, tokens(15), tokens(5))
-  await transaction.wait()
-
-  transaction = await escrow.connect(seller).list(3, buyer.address, tokens(10), tokens(5))
-  await transaction.wait()
-
-  console.log(`Finished.`)
+    console.log(`Finished deploying and listing properties.`);
 }
 
-// We recommend this pattern to be able to use async/await everywhere
-// and properly handle errors.
+// Entry point to handle errors and run the main function
 main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
+    console.error(error);
+    process.exitCode = 1;
 });

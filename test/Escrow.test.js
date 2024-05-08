@@ -6,8 +6,14 @@ const tokens = (n) => {
 }
 
 describe("Escrow", () => {
+    let buyer, seller, inspector, lender;
+    let realEstate, escrow;
+    
     it('Saves the addresses', async () => {
-        const realEstate = await ethers.getContractFactory('RealEstate')
+        
+        [buyer, seller, inspector, lender] = await ethers.getSigners();
+        console.log(buyer, seller);
+        let realEstate = await ethers.getContractFactory('RealEstate')
         realEstate = await realEstate.deploy()
 
        

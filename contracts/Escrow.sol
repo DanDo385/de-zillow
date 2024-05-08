@@ -1,4 +1,4 @@
-//SPDX-License-Identifier: Unlicense
+//SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 interface IERC721 {
@@ -16,17 +16,17 @@ contract Escrow {
     address public lender;
 
     modifier onlyBuyer(uint256 _nftID) {
-        require(msg.sender == buyer[_nftID], "Only buyer can call this method");
+        require(msg.sender == buyer[_nftID], "Only buyer can call");
         _;
     }
 
     modifier onlySeller() {
-        require(msg.sender == seller, "Only seller can call this method");
+        require(msg.sender == seller, "Only seller can call");
         _;
     }
 
     modifier onlyInspector() {
-        require(msg.sender == inspector, "Only inspector can call this method");
+        require(msg.sender == inspector, "Only inspector can call");
         _;
     }
 
@@ -50,7 +50,7 @@ contract Escrow {
         uint256 _purchasePrice, 
         uint256 _escrowAmount) 
         public payable onlySeller {
-        // Transfer NFT 
+
         IERC721(nftAddress).transferFrom(msg.sender, address(this), _nftID);
 
         isListed[_nftID] = true;
@@ -63,7 +63,6 @@ contract Escrow {
         require(msg.value >= escrowAmount[_nftID]);
     }
 
-    // Update Inspection Status
     function updateInspectionStatus(uint256 _nftID, bool _passed)
         public
         onlyInspector
@@ -71,7 +70,6 @@ contract Escrow {
         inspectionPassed[_nftID] = _passed;
     }
 
-    // Approve Sale
     function approveSale(uint256 _nftID) public {
         approval[_nftID][msg.sender] = true;
     }
